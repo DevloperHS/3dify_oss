@@ -1,15 +1,11 @@
-import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/db";
+import { createAuth } from "@/lib/auth";
 
 // Test-only auth instance: same database, adapter, and secret as the app's real
 // instance, but with email/password enabled so tests can create signed-in
 // sessions without a live Google OAuth round-trip. Sessions it creates are
 // indistinguishable at the database level from OAuth-created ones.
-const testAuth = betterAuth({
-  database: drizzleAdapter(db, { provider: "pg" }),
-  emailAndPassword: { enabled: true },
-});
+const testAuth = createAuth(db, { emailAndPassword: { enabled: true } });
 
 // Signs up (or signs in) a test user and returns request headers carrying
 // their session cookie, ready to pass to the seam under test.

@@ -7,6 +7,9 @@ import { signedInHeaders } from "@/test/auth-test-utils";
 // Seam 2: completing a sign-in persists a User row against our schema.
 // Guards the hand-written Drizzle schema against drift from what Better Auth
 // actually writes — if a column is missing or misnamed, sign-in fails here.
+// Asserting via direct table query is deliberate at this seam: the row's
+// existence/uniqueness IS the contract (Jobs and Assets will reference it),
+// and no app-facing interface exposes row counts.
 
 describe("sign-in persistence", () => {
   it("creates a User row with the signed-in identity", async () => {

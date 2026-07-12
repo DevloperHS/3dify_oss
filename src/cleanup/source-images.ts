@@ -39,8 +39,16 @@ export async function cleanupExpiredSourceImages(
     );
 
   let swept = 0;
+  const errors: Error[] = [];
   for (const row of expired) {
-    await deleter.destroy(row.publicId);
+    // One poisoned image must not block the rows behind it — collect the
+    // error, move on, and fail the run at the end so it's still visible.
+    try {
+      await deleter.destroy(row.publicId);
+    } catch (error) {
+      errors.push(error instanceof Error ? error : new Error(String(error)));
+      continue;
+    }
     // Deliberately does NOT bump updatedAt — that timestamp means "terminal
     // state reached" for this sweep's own cutoff.
     await db
@@ -48,6 +56,11 @@ export async function cleanupExpiredSourceImages(
       .set({ sourceImageDeletedAt: now })
       .where(eq(job.id, row.id));
     swept++;
+  }
+  if (errors.length > 0) {
+    throw new Error(
+      `source-image sweep: ${errors.length} deletion(s) failed (${errors[0].message}); ${swept} swept`,
+    );
   }
   return { swept };
 }

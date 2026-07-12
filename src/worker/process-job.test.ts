@@ -141,7 +141,7 @@ describe("processJob", () => {
     const { storage } = fakeAssetStorage();
     const flakyEngine = {
       async reconstruct(): Promise<never> {
-        throw new PipelineFailure("transient", "the 3D reconstruction timed out and will be retried");
+        throw new PipelineFailure("transient", "the 3D reconstruction timed out");
       },
     };
 
@@ -163,7 +163,7 @@ describe("processJob", () => {
     const { storage } = fakeAssetStorage();
     const flakyEngine = {
       async reconstruct(): Promise<never> {
-        throw new PipelineFailure("transient", "the 3D reconstruction timed out and will be retried");
+        throw new PipelineFailure("transient", "the 3D reconstruction timed out");
       },
     };
 
@@ -178,7 +178,7 @@ describe("processJob", () => {
     const [jobRow] = await db.select().from(job).where(eq(job.id, jobId));
     expect(jobRow.status).toBe("failed");
     expect(jobRow.failureCategory).toBe("transient");
-    expect(jobRow.failureReason).toBe("the 3D reconstruction timed out and will be retried");
+    expect(jobRow.failureReason).toBe("the 3D reconstruction timed out");
     expect(jobRow.attempts).toBe(3);
   });
 

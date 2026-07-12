@@ -30,4 +30,34 @@ The gate is fully built and tested behind a flag; flipping it on needs:
 - [ ] Upload a photo and watch it pass through `moderating`; the webhook
       handler logs its outcome in the response
 
+## 3. Local `.env` flip after Modal deploy
+
+Your `.env` currently has `RECONSTRUCTION_ENGINE=stub` so `pnpm worker` runs
+without a Modal deployment (I switched it — it was `modal` with `replace-me`
+placeholders, which fails at startup by design). After completing item 1:
+
+- [ ] Fill the real `MODAL_TRIPOSR_URL` / `MODAL_KEY` / `MODAL_SECRET`
+- [ ] Set `RECONSTRUCTION_ENGINE=modal`
+
+## 4. Live end-to-end pass (browser)
+
+Automated tests cover every seam, but a human browser run is the final check
+(Google sign-in can't be automated here):
+
+- [ ] `docker compose up -d && pnpm dev` + `pnpm worker`
+- [ ] Sign in, upload a photo, watch the job page: queued → preprocessing →
+      reconstructing → postprocessing → exporting → succeeded, viewer +
+      download work
+- [ ] Try the rejects: an >10MB file, a tiny (<256px) image, a GIF/HEIC —
+      each should be refused with a specific message before a job appears
+- [ ] Check `/library`: assets listed with working View/Download, job
+      history shows any failures with their reasons
+
+## 5. One product decision (from the closing review)
+
+- [ ] If Cloudinary's moderation webhook never arrives, a job sits in
+      `moderating` forever (no timeout/reaper) and its source image is never
+      swept. Decide the policy (e.g. fail after 24h) — recorded as known debt
+      #5 in `build_docs/handoff.md`.
+
 *(items added below as the run discovers them)*

@@ -1,6 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { asset, job } from "@/db/schema";
+import type { JobStatus } from "@/jobs/state-machine";
 
 // Library view queries (ticket 08): a user's full Job history and permanent
 // Asset library. Everything is filtered by the owning user here, at the
@@ -8,7 +9,7 @@ import { asset, job } from "@/db/schema";
 
 export type JobHistoryEntry = {
   id: string;
-  status: string;
+  status: JobStatus;
   failureReason: string | null;
   createdAt: Date;
   assetId: string | null;
@@ -36,7 +37,9 @@ export async function listJobHistory(
 export type LibraryAsset = {
   id: string;
   jobId: string;
-  r2Key: string;
+  // The object key in the S3-compatible asset store (the column keeps its
+  // historical r2_key name; the storage stopped being R2-specific in 2e62d7c).
+  storageKey: string;
   sizeBytes: number;
   createdAt: Date;
 };
@@ -49,7 +52,7 @@ export async function listAssets(
     .select({
       id: asset.id,
       jobId: asset.jobId,
-      r2Key: asset.r2Key,
+      storageKey: asset.r2Key,
       sizeBytes: asset.sizeBytes,
       createdAt: asset.createdAt,
     })

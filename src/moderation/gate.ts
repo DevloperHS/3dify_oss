@@ -10,10 +10,8 @@ import { isTerminal } from "@/jobs/state-machine";
 // Reconstruction compute can run before screening (closes the handoff's
 // "moderation bypass" debt for the moderated path).
 
-export function moderationEnabled(
-  env: Record<string, string | undefined> = process.env,
-): boolean {
-  return env.MODERATION_ENABLED === "true";
+export function moderationEnabled(): boolean {
+  return process.env.MODERATION_ENABLED === "true";
 }
 
 // User-facing, categorized reason — deliberately free of provider detail.

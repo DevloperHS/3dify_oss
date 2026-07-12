@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
+import type { JobStatus } from "@/jobs/state-machine";
 import { listAssets, listJobHistory } from "@/library/queries";
 import { getCurrentUser } from "@/lib/session";
 import { assetStorage } from "@/storage/assets";
@@ -11,7 +12,7 @@ import { assetStorage } from "@/storage/assets";
 // straight from the user-scoped queries; viewing an Asset in 3D goes through
 // the Job page, which already carries the ticket 02 viewer.
 
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_LABELS: Record<JobStatus, string> = {
   queued: "Queued",
   moderating: "Checking image",
   preprocessing: "Preparing image",
@@ -34,7 +35,7 @@ export default async function LibraryPage() {
     await Promise.all(
       assets.map(
         async (entry) =>
-          [entry.id, await assetStorage.downloadUrl(entry.r2Key)] as const,
+          [entry.id, await assetStorage.downloadUrl(entry.storageKey)] as const,
       ),
     ),
   );
@@ -92,9 +93,7 @@ export default async function LibraryPage() {
               className="flex items-center justify-between rounded-md border border-foreground/15 px-4 py-3"
             >
               <div className="flex flex-col">
-                <span className="font-medium">
-                  {STATUS_LABELS[entry.status] ?? entry.status}
-                </span>
+                <span className="font-medium">{STATUS_LABELS[entry.status]}</span>
                 <span className="text-xs opacity-60">
                   {entry.createdAt.toLocaleString()}
                 </span>

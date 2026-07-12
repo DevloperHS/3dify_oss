@@ -105,6 +105,26 @@ describe("cleanupExpiredSourceImages", () => {
     expect(row.sourceImageDeletedAt).toEqual(NOW);
   });
 
+  it("keeps sweeping past a poisoned image, then surfaces the failure", async () => {
+    const poisoned = await createJob({ status: "failed", updatedAt: ELEVEN_DAYS_AGO });
+    const healthy = await createJob({ status: "succeeded", updatedAt: ELEVEN_DAYS_AGO });
+    const deleter: SourceImageDeleter = {
+      async destroy(publicId) {
+        if (publicId === poisoned.publicId) throw new Error("provider exploded");
+        return "deleted";
+      },
+    };
+
+    await expect(cleanupExpiredSourceImages(db, deleter, NOW)).rejects.toThrow(
+      /1 deletion\(s\) failed/,
+    );
+
+    const [healthyRow] = await db.select().from(job).where(eq(job.id, healthy.jobId));
+    expect(healthyRow.sourceImageDeletedAt).toEqual(NOW);
+    const [poisonedRow] = await db.select().from(job).where(eq(job.id, poisoned.jobId));
+    expect(poisonedRow.sourceImageDeletedAt).toBeNull(); // retried next run
+  });
+
   it("does not touch the job's Asset", async () => {
     const { jobId } = await createJob({
       status: "succeeded",

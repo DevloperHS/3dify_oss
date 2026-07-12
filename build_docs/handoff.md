@@ -1,6 +1,6 @@
 # Building Maker: From a Photo to a 3D Asset — a Handoff
 
-*Last updated: 2026-07-12 · Repo state: tickets 01–02 shipped, ticket 03 next*
+*Last updated: 2026-07-12 (evening autonomous run) · Repo state: tickets 01–09 all implemented; Modal deploy + live-service verification pending human (see `build_docs/needs-human.md`)*
 
 Maker is a web service that turns a single photo of an object into a downloadable, browser-viewable 3D asset (GLB). You sign in with Google, upload a picture, and a pipeline does the rest asynchronously — screening, preprocessing, AI reconstruction, mesh cleanup, and storage into your permanent asset library.
 
@@ -89,17 +89,25 @@ pnpm worker              # BullMQ worker, separate terminal
 
 Verification commands: `pnpm typecheck`, `pnpm test` (needs docker up — tests hit a real `maker_test` database), `pnpm build`.
 
-## Where to pick up: ticket 03
+## The 2026-07-12 autonomous run: tickets 03–09
 
-**`.scratch/image-to-3d-mvp/issues/03-real-reconstruction-triposr-modal.md`** — swap the stub for real TripoSR running as a Modal serverless GPU function (scale-to-zero). The contract: implement `ReconstructionEngine` calling Modal over HTTP, set a generous BullMQ job timeout (3–5 min, absorbs cold starts), and change *nothing* outside the reconstruction module. Prerequisite: a Modal account (GitHub sign-up, starter plan needs no card, $30/mo compute credit).
+All implementation tickets are now done (each closed in its file with notes; one commit per ticket):
 
-After that, the frontier in dependency order: 04 postprocessing (watertight repair — TripoSR meshes have holes), 05 upload constraints, 06 moderation, 07 failure handling, 08 asset library view, 09 source-image cleanup.
+- **03 — TripoSR on Modal** (`d40b78e`, `e092e79`): `modal/triposr_app.py` (T4, baked weights, proxy auth, scale-to-zero) + `ModalReconstructionEngine` with a 4-min HTTP timeout standing in for BullMQ's nonexistent per-job timeout. Engine selection via `RECONSTRUCTION_ENGINE` (modal default, stub opt-out). **Deploy + live mesh still pending a Modal account.**
+- **04 — Watertight repair** (`97ce8fe`): pure-TS boundary-loop capping on `@gltf-transform/core`; verified against the prototype's real TripoSR chair mesh; open meshes can't reach storage.
+- **05 — Upload constraints** (`aaeeb4b`): magic-byte format sniffing (HEIC named), 10MB cap, ≥256×256; >2048px downscaled in a new worker Preprocessing stage (sharp).
+- **06 — Moderation gate** (`bcf5d0c`): Cloudinary aws_rek via signature-verified webhook; moderated jobs only reach the queue through approval. **Behind `MODERATION_ENABLED` until the add-on is activated on the account.**
+- **07 — Failure handling** (`2f8a48b`): `PipelineFailure` terminal/transient tagging at raise points, BullMQ 3 attempts + exponential backoff, `UnrecoverableError` for terminal, retry-reentrant `processJob`, `succeededJobCount` metering query.
+- **08 — Library view** (`a98109e`): `/library` server component; Assets + full Job history, user-scoped queries.
+- **09 — Source-image retention** (`e41e331`): daily BullMQ-scheduled sweep deleting Cloudinary images of jobs terminal >10 days; idempotent via `source_image_deleted_at`.
+
+**Where to pick up: `build_docs/needs-human.md`** — the ordered checklist of everything that needs the human (Modal auth + deploy, Cloudinary add-on, live end-to-end runs).
 
 ## Known debts, flagged on purpose
 
-Carried in ticket notes so they don't get lost:
-
-1. **Moderation bypass invariant** — the state machine's skip-ahead rule means `queued → reconstructing` is legal. Fine now; must be tightened when ticket 06 lands so no reconstruction compute ever runs before screening.
-2. **Non-atomic Job transitions** — `processJob` reads status then writes; two concurrent workers could race. Revisit with ticket 07's retry work.
-3. **Presigned URLs expire after 1h** — a stale job page past that shows a broken viewer until refresh. Production answer is custom-domain/CDN serving on the bucket, a deploy-time concern.
-4. **Failure handling is a placeholder** — every worker error currently becomes a generic `"processing error"`. Terminal/transient categorization, retries with backoff, and metering rules are all specified (spec.md "Job orchestration") and land in ticket 07.
+1. ~~Moderation bypass invariant~~ — closed for the moderated path (ticket 06: jobs only enter the queue post-approval). With `MODERATION_ENABLED=false` the skip is deliberate.
+2. **Non-atomic Job transitions** — `processJob` reads status then writes; two concurrent workers could race. Unchanged; BullMQ's per-job-id keying makes it unlikely today.
+3. **Presigned URLs expire after 1h** — stale job/library pages show broken viewer/download links until refresh. Production answer is custom-domain/CDN serving on the bucket.
+4. ~~Failure handling placeholder~~ — closed by ticket 07.
+5. **Stuck `moderating` jobs** (new, found in review) — if Cloudinary's moderation webhook never arrives, the job sits in `moderating` forever: no timeout/reaper, and the retention sweep only matches terminal jobs, so its source image is never cleaned up either. Needs a product decision (fail after N hours? re-poll Cloudinary?) before moderation goes live.
+6. **Preprocessing ownership deviation** (documented in ticket 05) — spec.md says the Preprocessing stage owns the background-removal call; in practice rembg runs inside the Modal TripoSR function. Fine until an engine that doesn't bundle it appears.

@@ -56,10 +56,11 @@ export class ModalReconstructionEngine implements ReconstructionEngine {
       });
     } catch (cause) {
       // Timeout (cold start overran) or network failure — transient by the
-      // spec's own example.
+      // spec's own example. The reason must not promise a retry: it's only
+      // ever shown once attempts are exhausted.
       throw new PipelineFailure(
         "transient",
-        "the 3D reconstruction timed out and will be retried",
+        "the 3D reconstruction timed out",
         `TripoSR endpoint unreachable or timed out after ${timeoutMs}ms`,
         { cause },
       );

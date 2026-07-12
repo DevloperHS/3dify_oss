@@ -53,11 +53,13 @@ image = (
         "nvidia/cuda:12.4.0-devel-ubuntu22.04", add_python="3.11"
     )
     .entrypoint([])
-    .apt_install("git", "libgl1", "libglib2.0-0")
+    .apt_install("git", "libgl1", "libglib2.0-0", "build-essential")
     .pip_install("torch==2.4.1", "numpy==1.26.4")
     # No GPU is attached at image-build time, so tell nvcc which architectures
-    # to compile for: T4 (7.5) plus common fallbacks (A100/A10G/L4).
-    .env({"TORCH_CUDA_ARCH_LIST": "7.5;8.0;8.6;8.9"})
+    # to compile for: T4 (7.5) plus common fallbacks (A100/A10G/L4). Modal's
+    # builder exports CXX=clang++, which neither exists in this image nor
+    # suits nvcc — pin the toolchain back to gcc for the CUDA extension build.
+    .env({"TORCH_CUDA_ARCH_LIST": "7.5;8.0;8.6;8.9", "CC": "gcc", "CXX": "g++"})
     .pip_install("git+https://github.com/tatsy/torchmcubes.git")
     .pip_install(
         # TripoSR's requirements.txt, minus gradio/xatlas/moderngl/imageio

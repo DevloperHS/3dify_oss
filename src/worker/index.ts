@@ -2,14 +2,14 @@ import "dotenv/config";
 import { Worker } from "bullmq";
 import { db } from "@/db";
 import { createRedisConnection, JOBS_QUEUE_NAME, type JobQueuePayload } from "@/jobs/queue";
-import { StubReconstructionEngine } from "@/reconstruction/stub-engine";
+import { selectEngineFromEnv } from "@/reconstruction/select-engine";
 import { assetStorage } from "@/storage/assets";
 import { processJob, type FetchedImage } from "./process-job";
 
 // The separate worker process from the spec's stack: consumes the BullMQ
 // queue and runs the pipeline for each Job. Run with `pnpm worker`.
-// The stub engine is swapped for TripoSR-on-Modal in ticket 03 — nothing
-// else here changes.
+// Reconstruction runs on TripoSR-on-Modal by default; set
+// RECONSTRUCTION_ENGINE=stub for local dev without a Modal deployment.
 
 async function fetchImage(url: string): Promise<FetchedImage> {
   const response = await fetch(url);
@@ -25,7 +25,7 @@ async function fetchImage(url: string): Promise<FetchedImage> {
 
 const deps = {
   db,
-  engine: new StubReconstructionEngine(),
+  engine: selectEngineFromEnv(),
   assets: assetStorage,
   fetchImage,
 };

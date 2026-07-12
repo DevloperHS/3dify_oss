@@ -3,6 +3,7 @@ import type {
   ReconstructionInput,
   ReconstructionResult,
 } from "./engine";
+import { GLB_MAGIC } from "./glb";
 
 // Returns the same placeholder mesh for every input: a vertex-colored cube,
 // built as a GLB (glTF 2.0 binary) container from scratch. Vertex colors and
@@ -133,7 +134,7 @@ function buildCubeGlb(): Uint8Array {
   const totalLength = 12 + 8 + jsonPadded.byteLength + 8 + binLength;
   const glb = new Uint8Array(totalLength);
   const view = new DataView(glb.buffer);
-  view.setUint32(0, 0x46546c67, true); // "glTF"
+  view.setUint32(0, GLB_MAGIC, true); // "glTF"
   view.setUint32(4, 2, true);
   view.setUint32(8, totalLength, true);
   view.setUint32(12, jsonPadded.byteLength, true);

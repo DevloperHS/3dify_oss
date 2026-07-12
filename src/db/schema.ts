@@ -1,4 +1,12 @@
-import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 // Better Auth core tables (shape per @better-auth/cli generate for the drizzle adapter).
 // `user` is the app's User domain entity — Jobs and Assets will reference user.id.
@@ -52,3 +60,62 @@ export const verification = pgTable("verification", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// Pipeline domain tables — see CONTEXT.md for Job/Asset definitions and
+// spec.md "Data model". The full state list is declared up front even though
+// the tracer bullet only walks queued → reconstructing → exporting →
+// succeeded; Moderation/Preprocessing/Postprocessing stages activate their
+// states in later tickets without a schema migration.
+
+export const jobStatus = pgEnum("job_status", [
+  "queued",
+  "moderating",
+  "preprocessing",
+  "reconstructing",
+  "postprocessing",
+  "exporting",
+  "succeeded",
+  "failed",
+]);
+
+export const failureCategory = pgEnum("failure_category", [
+  "terminal",
+  "transient",
+]);
+
+export const job = pgTable(
+  "job",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    status: jobStatus("status").notNull().default("queued"),
+    failureCategory: failureCategory("failure_category"),
+    failureReason: text("failure_reason"),
+    attempts: integer("attempts").notNull().default(0),
+    sourceImageUrl: text("source_image_url").notNull(),
+    sourceImagePublicId: text("source_image_public_id").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("job_user_id_idx").on(table.userId)],
+);
+
+export const asset = pgTable(
+  "asset",
+  {
+    id: text("id").primaryKey(),
+    jobId: text("job_id")
+      .notNull()
+      .unique()
+      .references(() => job.id, { onDelete: "restrict" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    r2Key: text("r2_key").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("asset_user_id_idx").on(table.userId)],
+);

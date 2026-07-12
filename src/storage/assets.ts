@@ -1,10 +1,12 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-// Asset (GLB) storage — a plain module boundary wrapping Cloudflare R2 via its
-// S3-compatible API (spec.md "Export/Storage"). Downloads are served through
-// short-lived presigned URLs for now; production serving via a custom domain
-// on the bucket is a deploy-time concern, not a code change here.
+// Asset (GLB) storage — a plain module boundary over any S3-compatible store
+// (spec.md "Export/Storage", amended: local dev uses the MinIO container from
+// docker-compose; production points the same env vars at Backblaze B2 or
+// Cloudflare R2). Downloads are served through short-lived presigned URLs for
+// now; production serving via a bucket custom domain is a deploy-time
+// concern, not a code change here.
 
 export type AssetStorage = {
   uploadGlb(key: string, bytes: Uint8Array): Promise<void>;
@@ -14,21 +16,23 @@ export type AssetStorage = {
 let client: S3Client | null = null;
 let bucket = "";
 
-function getR2Client() {
+function getS3Client() {
   if (client) return { client, bucket };
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-  bucket = process.env.R2_BUCKET ?? "";
-  if (!accountId || !accessKeyId || !secretAccessKey || !bucket) {
+  const endpoint = process.env.S3_ENDPOINT;
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
+  bucket = process.env.S3_BUCKET ?? "";
+  if (!endpoint || !accessKeyId || !secretAccessKey || !bucket) {
     throw new Error(
-      "R2 is not configured — set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET (see .env.example)",
+      "Asset storage is not configured — set S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_BUCKET (see .env.example)",
     );
   }
   client = new S3Client({
-    region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    region: process.env.S3_REGION ?? "auto",
+    endpoint,
     credentials: { accessKeyId, secretAccessKey },
+    // MinIO requires path-style addressing; R2 and B2 accept it too.
+    forcePathStyle: true,
   });
   return { client, bucket };
 }
@@ -37,7 +41,7 @@ const DOWNLOAD_URL_TTL_SECONDS = 60 * 60;
 
 export const assetStorage: AssetStorage = {
   async uploadGlb(key, bytes) {
-    const { client, bucket } = getR2Client();
+    const { client, bucket } = getS3Client();
     await client.send(
       new PutObjectCommand({
         Bucket: bucket,
@@ -49,7 +53,7 @@ export const assetStorage: AssetStorage = {
   },
 
   async downloadUrl(key) {
-    const { client, bucket } = getR2Client();
+    const { client, bucket } = getS3Client();
     return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), {
       expiresIn: DOWNLOAD_URL_TTL_SECONDS,
     });

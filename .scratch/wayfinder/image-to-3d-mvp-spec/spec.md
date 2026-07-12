@@ -111,5 +111,12 @@ Next.js (frontend + API routes) · Postgres (accounts/Jobs/Assets) · Redis + Bu
 
 ## Further Notes
 
+- **Storage amendment (2026-07-12, post-spec):** Cloudflare R2 requires a payment card even on
+  the free tier, which isn't currently available. The Export/Storage stage is unchanged in shape
+  but points at any S3-compatible store via env vars: MinIO (local docker-compose container) for
+  dev, Backblaze B2 (10GB free, no card, free egress via Cloudflare partnership) as the planned
+  production target, with R2 still a drop-in later. References to R2 elsewhere in this spec should
+  be read as "the configured S3-compatible asset store".
+
 - Two research documents backing the Reconstruction and GPU-compute decisions (`research/01-reconstruction-approach.md`, `research/05-production-gpu-compute.md`) contain some figures the researcher explicitly flagged as unverified against a primary source (e.g. exact AWS/GCP GPU on-demand pricing, some Tripo3D/Stability API figures). None of these affect the decisions actually made (TripoSR self-hosted on Modal), since those were the confidently-sourced conclusions — the flagged figures relate to alternatives that were not chosen. Worth a fresh check only if either decision is ever revisited.
 - The classification of ambiguous Reconstruction-stage errors as terminal vs. transient (ticket 07) is deliberately left to implementation time rather than enumerated here, since the real failure modes will only be fully known once the Reconstruction engine is running against real, varied user uploads.

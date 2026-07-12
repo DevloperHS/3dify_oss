@@ -28,6 +28,12 @@ every session working this map):
   Cloudflare R2 for generated GLB Assets — confirmed zero egress fees, free tier 10GB-month
   storage; **production serving requires a custom domain on the bucket**, not the rate-limited
   `r2.dev` dev subdomain. See ticket 02 (closed).
+  **Amended 2026-07-12:** R2 requires a payment card on file even for its free tier, which the
+  developer can't provide right now. Asset storage stays behind the same S3-compatible interface:
+  **MinIO (docker-compose container) for local dev**, and **Backblaze B2 (10GB free, no card,
+  S3-compatible, free egress via Cloudflare partnership) as the planned production target** — R2
+  remains a drop-in option later if a card becomes available. Code-wise this was only an env-var
+  generalization (`S3_ENDPOINT`/`S3_ACCESS_KEY_ID`/...), no interface change.
 - **Reconstruction approach:** self-hosted TripoSR (primary), InstantMesh (fallback if fidelity
   disappoints in prototyping). Runs in the GPU-capable worker process. See ticket 01 (closed).
 - **GPU compute — prototype vs. production split:** the developer's local 6GB GPU covers

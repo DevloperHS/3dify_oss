@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PipelineFailure } from "@/jobs/failures";
 import {
   ModalReconstructionEngine,
   modalEngineFromEnv,
@@ -59,6 +60,42 @@ describe("ModalReconstructionEngine", () => {
     await expect(
       engine.reconstruct({ imageBytes: new Uint8Array([1]), contentType: "image/png" }),
     ).rejects.toThrow(/500/);
+  });
+
+  it.each([
+    [500, "transient"],
+    [429, "transient"],
+    [422, "terminal"],
+  ] as const)("categorizes HTTP %i as %s, with a provider-free user reason", async (status, category) => {
+    const engine = engineWith(async () => new Response("x", { status }));
+    const error = await engine
+      .reconstruct({ imageBytes: new Uint8Array([1]), contentType: "image/png" })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(error).toBeInstanceOf(PipelineFailure);
+    const failure = error as PipelineFailure;
+    expect(failure.category).toBe(category);
+    expect(failure.userFacingReason).not.toMatch(/modal|triposr|http|\d{3}/i);
+  });
+
+  it("categorizes a timeout as transient", async () => {
+    const engine = engineWith(
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+        }),
+      10,
+    );
+    const error = await engine
+      .reconstruct({ imageBytes: new Uint8Array([1]), contentType: "image/png" })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(error).toBeInstanceOf(PipelineFailure);
+    expect((error as PipelineFailure).category).toBe("transient");
   });
 
   it("throws when the response body is not a GLB", async () => {

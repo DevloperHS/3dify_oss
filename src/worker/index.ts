@@ -1,7 +1,13 @@
 import "dotenv/config";
-import { Worker } from "bullmq";
+import { UnrecoverableError, Worker } from "bullmq";
 import { db } from "@/db";
-import { createRedisConnection, JOBS_QUEUE_NAME, type JobQueuePayload } from "@/jobs/queue";
+import { PipelineFailure } from "@/jobs/failures";
+import {
+  createRedisConnection,
+  JOB_MAX_ATTEMPTS,
+  JOBS_QUEUE_NAME,
+  type JobQueuePayload,
+} from "@/jobs/queue";
 import { selectEngineFromEnv } from "@/reconstruction/select-engine";
 import { assetStorage } from "@/storage/assets";
 import { processJob, type FetchedImage } from "./process-job";
@@ -14,7 +20,12 @@ import { processJob, type FetchedImage } from "./process-job";
 async function fetchImage(url: string): Promise<FetchedImage> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`fetching source image failed: HTTP ${response.status}`);
+    // Storage/CDN hiccups are worth retrying.
+    throw new PipelineFailure(
+      "transient",
+      "the uploaded image could not be retrieved",
+      `fetching source image failed: HTTP ${response.status}`,
+    );
   }
   return {
     bytes: new Uint8Array(await response.arrayBuffer()),
@@ -33,7 +44,19 @@ const deps = {
 const worker = new Worker<JobQueuePayload>(
   JOBS_QUEUE_NAME,
   async (bullJob) => {
-    await processJob(deps, bullJob.data.jobId);
+    const attempt = {
+      number: bullJob.attemptsMade + 1,
+      max: bullJob.opts.attempts ?? JOB_MAX_ATTEMPTS,
+    };
+    try {
+      await processJob(deps, bullJob.data.jobId, attempt);
+    } catch (error) {
+      // Terminal failures must not burn the remaining retry attempts.
+      if (error instanceof PipelineFailure && error.category === "terminal") {
+        throw new UnrecoverableError(error.message);
+      }
+      throw error;
+    }
   },
   { connection: createRedisConnection() },
 );

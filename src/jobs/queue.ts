@@ -7,6 +7,13 @@ import IORedis from "ioredis";
 
 export const JOBS_QUEUE_NAME = "jobs";
 
+// Retry policy (ticket 07, spec.md "Job orchestration"): 3 total attempts
+// (1 original + 2 retries), exponential backoff starting at 10s (10s, 20s).
+// Terminal failures bypass this — the worker throws UnrecoverableError,
+// which BullMQ never retries.
+export const JOB_MAX_ATTEMPTS = 3;
+export const JOB_BACKOFF_INITIAL_MS = 10_000;
+
 export type JobQueuePayload = {
   jobId: string;
 };
@@ -34,5 +41,13 @@ function jobsQueue(): Queue<JobQueuePayload> {
 
 export async function enqueueJob(jobId: string): Promise<void> {
   // Keyed by the Job row's id so a double-submit can't enqueue it twice.
-  await jobsQueue().add("process", { jobId }, { jobId });
+  await jobsQueue().add(
+    "process",
+    { jobId },
+    {
+      jobId,
+      attempts: JOB_MAX_ATTEMPTS,
+      backoff: { type: "exponential", delay: JOB_BACKOFF_INITIAL_MS },
+    },
+  );
 }

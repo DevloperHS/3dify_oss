@@ -1,4 +1,5 @@
 import { Document, NodeIO, Primitive } from "@gltf-transform/core";
+import { PipelineFailure } from "@/jobs/failures";
 
 // Postprocessing — mesh repair for watertight export (ticket 04, spec.md
 // "Postprocessing"). TripoSR's raw output has open boundary loops (holes)
@@ -34,7 +35,11 @@ export async function repairToWatertight(
   const repaired = await io.writeBinary(doc);
   const remaining = await countBoundaryEdges(repaired);
   if (remaining > 0) {
-    throw new Error(
+    // Repair is deterministic, but reconstruction isn't necessarily — a
+    // fresh mesh from a retry may repair cleanly. Transient.
+    throw new PipelineFailure(
+      "transient",
+      "the generated 3D model could not be cleaned up",
       `mesh is not watertight after repair: ${remaining} boundary edges remain`,
     );
   }

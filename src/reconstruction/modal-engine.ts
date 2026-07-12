@@ -1,3 +1,4 @@
+import { PipelineFailure } from "@/jobs/failures";
 import type {
   ReconstructionEngine,
   ReconstructionInput,
@@ -39,25 +40,50 @@ export class ModalReconstructionEngine implements ReconstructionEngine {
       fetchFn = fetch,
     } = this.options;
 
-    const response = await fetchFn(endpointUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": input.contentType,
-        "Modal-Key": modalKey,
-        "Modal-Secret": modalSecret,
-      },
-      // Copy into a plain ArrayBuffer — a Uint8Array view's buffer may be
-      // larger than the view, and fetch sends the whole buffer.
-      body: input.imageBytes.slice().buffer,
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    let response: Response;
+    try {
+      response = await fetchFn(endpointUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": input.contentType,
+          "Modal-Key": modalKey,
+          "Modal-Secret": modalSecret,
+        },
+        // Copy into a plain ArrayBuffer — a Uint8Array view's buffer may be
+        // larger than the view, and fetch sends the whole buffer.
+        body: input.imageBytes.slice().buffer,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (cause) {
+      // Timeout (cold start overran) or network failure — transient by the
+      // spec's own example.
+      throw new PipelineFailure(
+        "transient",
+        "the 3D reconstruction timed out and will be retried",
+        `TripoSR endpoint unreachable or timed out after ${timeoutMs}ms`,
+        { cause },
+      );
+    }
     if (!response.ok) {
-      throw new Error(`TripoSR endpoint failed: HTTP ${response.status}`);
+      // Server-side/overload problems are worth retrying; anything else means
+      // this input will never reconstruct.
+      const transient = response.status >= 500 || response.status === 429;
+      throw new PipelineFailure(
+        transient ? "transient" : "terminal",
+        transient
+          ? "the 3D reconstruction service was temporarily unavailable"
+          : "the image could not be turned into a 3D model",
+        `TripoSR endpoint failed: HTTP ${response.status}`,
+      );
     }
 
     const glb = new Uint8Array(await response.arrayBuffer());
     if (!hasGlbMagic(glb)) {
-      throw new Error("TripoSR endpoint returned a non-GLB response");
+      throw new PipelineFailure(
+        "transient",
+        "the 3D reconstruction returned an invalid model",
+        "TripoSR endpoint returned a non-GLB response",
+      );
     }
     return { glb };
   }

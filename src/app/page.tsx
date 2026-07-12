@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/session";
 import { SignInButton, SignOutButton } from "@/components/auth-buttons";
@@ -13,6 +14,9 @@ export default async function Home() {
       {user ? (
         <div className="flex flex-col items-center gap-6">
           <UploadForm />
+          <Link href="/library" className="text-sm underline opacity-70 hover:opacity-100">
+            Your library →
+          </Link>
           <div className="flex items-center gap-3 text-sm opacity-70">
             <span>
               Signed in as <span className="font-medium">{user.name}</span>

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { asset, job, user } from "@/db/schema";
 import { countBoundaryEdges } from "@/postprocessing/watertight";
 import { StubReconstructionEngine } from "@/reconstruction/stub-engine";
+import { testImage } from "@/test/image-test-utils";
 import type { AssetStorage } from "@/storage/assets";
 import { processJob, type ProcessJobDeps } from "./process-job";
 
@@ -20,8 +21,9 @@ function fakeAssetStorage() {
   return { storage, uploads };
 }
 
+// A real decodable PNG — preprocessing (downscale) parses it for real.
 const fakeFetchImage: ProcessJobDeps["fetchImage"] = async () => ({
-  bytes: new Uint8Array([137, 80, 78, 71]),
+  bytes: await testImage("png", 300, 300),
   contentType: "image/png",
 });
 

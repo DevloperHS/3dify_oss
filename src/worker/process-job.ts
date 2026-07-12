@@ -3,14 +3,15 @@ import type { Db } from "@/db/client";
 import { asset, job } from "@/db/schema";
 import { assertTransition, canTransition, isTerminal, type JobStatus } from "@/jobs/state-machine";
 import { repairToWatertight } from "@/postprocessing/watertight";
+import { downscaleIfNeeded } from "@/preprocessing/downscale";
 import type { ReconstructionEngine } from "@/reconstruction/engine";
 import type { AssetStorage } from "@/storage/assets";
 
-// The worker-side pipeline for one Job: Reconstruction → Postprocessing →
-// Export/Storage (Moderation/Preprocessing slot in between in later tickets).
+// The worker-side pipeline for one Job: Preprocessing → Reconstruction →
+// Postprocessing → Export/Storage (Moderation slots in ahead in ticket 06).
 // External effects go through injected deps so tests can run against the test
-// db with fakes; Postprocessing is pure CPU, so the real implementation runs
-// everywhere, tests included.
+// db with fakes; Pre/Postprocessing are pure CPU, so the real implementations
+// run everywhere, tests included.
 
 export type FetchedImage = {
   bytes: Uint8Array;
@@ -31,11 +32,15 @@ export async function processJob(deps: ProcessJobDeps, jobId: string): Promise<v
   if (isTerminal(row.status)) return;
 
   try {
-    await transition(deps.db, jobId, row.status, "reconstructing");
+    await transition(deps.db, jobId, row.status, "preprocessing");
     const image = await deps.fetchImage(row.sourceImageUrl);
+    // Oversized sources (>2048px) are downscaled, never rejected (ticket 05).
+    const preprocessed = await downscaleIfNeeded(image.bytes, image.contentType);
+
+    await transition(deps.db, jobId, "preprocessing", "reconstructing");
     const { glb } = await deps.engine.reconstruct({
-      imageBytes: image.bytes,
-      contentType: image.contentType,
+      imageBytes: preprocessed.bytes,
+      contentType: preprocessed.contentType,
     });
 
     await transition(deps.db, jobId, "reconstructing", "postprocessing");

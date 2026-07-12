@@ -1,19 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isTerminal, type JobStatus as JobStatusValue } from "@/jobs/state-machine";
 import { GlbViewer } from "./glb-viewer";
 
 type JobStatusResponse = {
   id: string;
-  status: string;
+  status: JobStatusValue;
   failureReason: string | null;
   asset?: { id: string; url: string; sizeBytes: number };
 };
 
-const TERMINAL_STATUSES = ["succeeded", "failed"];
 const POLL_INTERVAL_MS = 2500;
 
-const STAGE_LABELS: Record<string, string> = {
+const STAGE_LABELS: Partial<Record<JobStatusValue, string>> = {
   queued: "Waiting in the queue…",
   moderating: "Checking the image…",
   preprocessing: "Preparing the image…",
@@ -47,7 +47,7 @@ export function JobStatus({ jobId }: { jobId: string }) {
       const data: JobStatusResponse = await response.json();
       if (cancelled) return;
       setJob(data);
-      if (!TERMINAL_STATUSES.includes(data.status)) {
+      if (!isTerminal(data.status)) {
         timer = setTimeout(poll, POLL_INTERVAL_MS);
       }
     }

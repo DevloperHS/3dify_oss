@@ -14,7 +14,7 @@ export type AssetStorage = {
 let client: S3Client | null = null;
 let bucket = "";
 
-function r2() {
+function getR2Client() {
   if (client) return { client, bucket };
   const accountId = process.env.R2_ACCOUNT_ID;
   const accessKeyId = process.env.R2_ACCESS_KEY_ID;
@@ -37,7 +37,7 @@ const DOWNLOAD_URL_TTL_SECONDS = 60 * 60;
 
 export const assetStorage: AssetStorage = {
   async uploadGlb(key, bytes) {
-    const { client, bucket } = r2();
+    const { client, bucket } = getR2Client();
     await client.send(
       new PutObjectCommand({
         Bucket: bucket,
@@ -49,7 +49,7 @@ export const assetStorage: AssetStorage = {
   },
 
   async downloadUrl(key) {
-    const { client, bucket } = r2();
+    const { client, bucket } = getR2Client();
     return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), {
       expiresIn: DOWNLOAD_URL_TTL_SECONDS,
     });

@@ -7,6 +7,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+import { JOB_STATUSES } from "@/jobs/state-machine";
 
 // Better Auth core tables (shape per @better-auth/cli generate for the drizzle adapter).
 // `user` is the app's User domain entity — Jobs and Assets will reference user.id.
@@ -67,16 +68,7 @@ export const verification = pgTable("verification", {
 // succeeded; Moderation/Preprocessing/Postprocessing stages activate their
 // states in later tickets without a schema migration.
 
-export const jobStatus = pgEnum("job_status", [
-  "queued",
-  "moderating",
-  "preprocessing",
-  "reconstructing",
-  "postprocessing",
-  "exporting",
-  "succeeded",
-  "failed",
-]);
+export const jobStatus = pgEnum("job_status", JOB_STATUSES);
 
 export const failureCategory = pgEnum("failure_category", [
   "terminal",

@@ -21,6 +21,10 @@ export type SourceImageStorage = {
     contentType: string,
     options?: UploadOptions,
   ): Promise<StoredSourceImage>;
+  // Removes a stored Source Image (ticket 09's retention sweep). An image
+  // that's already gone reports "not-found" rather than throwing — the sweep
+  // treats both as success.
+  destroy(publicId: string): Promise<"deleted" | "not-found">;
 };
 
 let configured = false;
@@ -58,5 +62,15 @@ export const sourceImageStorage: SourceImageStorage = {
         : {}),
     });
     return { url: result.secure_url, publicId: result.public_id };
+  },
+
+  async destroy(publicId) {
+    configureCloudinary();
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type: "image",
+    });
+    if (result.result === "ok") return "deleted";
+    if (result.result === "not found") return "not-found";
+    throw new Error(`Cloudinary destroy failed: ${result.result}`);
   },
 };

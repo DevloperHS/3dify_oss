@@ -88,6 +88,9 @@ export const job = pgTable(
     attempts: integer("attempts").notNull().default(0),
     sourceImageUrl: text("source_image_url").notNull(),
     sourceImagePublicId: text("source_image_public_id").notNull(),
+    // Set by the retention sweep (ticket 09) once the Source Image is gone
+    // from Cloudinary — the marker that makes the sweep idempotent.
+    sourceImageDeletedAt: timestamp("source_image_deleted_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

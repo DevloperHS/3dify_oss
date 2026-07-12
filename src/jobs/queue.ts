@@ -39,6 +39,14 @@ function jobsQueue(): Queue<JobQueuePayload> {
   return existing;
 }
 
+// Maintenance queue (ticket 09): scheduled sweeps, separate from the
+// pipeline queue so cleanup work never competes with user jobs.
+export const MAINTENANCE_QUEUE_NAME = "maintenance";
+export const SOURCE_IMAGE_CLEANUP_JOB = "source-image-cleanup";
+// Daily at 03:00 — the retention window is measured in days, so any daily
+// cadence satisfies it.
+export const SOURCE_IMAGE_CLEANUP_CRON = "0 3 * * *";
+
 export async function enqueueJob(jobId: string): Promise<void> {
   // Keyed by the Job row's id so a double-submit can't enqueue it twice.
   await jobsQueue().add(

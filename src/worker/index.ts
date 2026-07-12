@@ -1,15 +1,20 @@
 import "dotenv/config";
-import { UnrecoverableError, Worker } from "bullmq";
+import { Queue, UnrecoverableError, Worker } from "bullmq";
+import { cleanupExpiredSourceImages } from "@/cleanup/source-images";
 import { db } from "@/db";
 import { PipelineFailure } from "@/jobs/failures";
 import {
   createRedisConnection,
   JOB_MAX_ATTEMPTS,
   JOBS_QUEUE_NAME,
+  MAINTENANCE_QUEUE_NAME,
+  SOURCE_IMAGE_CLEANUP_CRON,
+  SOURCE_IMAGE_CLEANUP_JOB,
   type JobQueuePayload,
 } from "@/jobs/queue";
 import { selectEngineFromEnv } from "@/reconstruction/select-engine";
 import { assetStorage } from "@/storage/assets";
+import { sourceImageStorage } from "@/storage/source-images";
 import { processJob, type FetchedImage } from "./process-job";
 
 // The separate worker process from the spec's stack: consumes the BullMQ
@@ -68,4 +73,33 @@ worker.on("failed", (bullJob, error) => {
   console.error(`[worker] job ${bullJob?.data.jobId} failed: ${error.message}`);
 });
 
-console.log(`[worker] listening on queue "${JOBS_QUEUE_NAME}"`);
+// Daily Source Image retention sweep (ticket 09), scheduled and consumed by
+// this same process — no extra infrastructure.
+const maintenanceQueue = new Queue(MAINTENANCE_QUEUE_NAME, {
+  connection: createRedisConnection(),
+});
+maintenanceQueue
+  .upsertJobScheduler(
+    SOURCE_IMAGE_CLEANUP_JOB,
+    { pattern: SOURCE_IMAGE_CLEANUP_CRON },
+    { name: SOURCE_IMAGE_CLEANUP_JOB },
+  )
+  .catch((error: Error) => {
+    console.error(`[worker] failed to schedule cleanup: ${error.message}`);
+  });
+
+const maintenanceWorker = new Worker(
+  MAINTENANCE_QUEUE_NAME,
+  async () => {
+    const { swept } = await cleanupExpiredSourceImages(db, sourceImageStorage);
+    console.log(`[worker] source-image cleanup swept ${swept} image(s)`);
+  },
+  { connection: createRedisConnection() },
+);
+maintenanceWorker.on("failed", (_bullJob, error) => {
+  console.error(`[worker] source-image cleanup failed: ${error.message}`);
+});
+
+console.log(
+  `[worker] listening on queues "${JOBS_QUEUE_NAME}", "${MAINTENANCE_QUEUE_NAME}"`,
+);

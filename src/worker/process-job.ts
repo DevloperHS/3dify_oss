@@ -2,13 +2,15 @@ import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { asset, job } from "@/db/schema";
 import { assertTransition, canTransition, isTerminal, type JobStatus } from "@/jobs/state-machine";
+import { repairToWatertight } from "@/postprocessing/watertight";
 import type { ReconstructionEngine } from "@/reconstruction/engine";
 import type { AssetStorage } from "@/storage/assets";
 
-// The worker-side pipeline for one Job (tracer-bullet shape: Reconstruction →
-// Export/Storage; Moderation/Preprocessing/Postprocessing slot in between in
-// later tickets). All effects go through injected deps so tests can run it
-// against the test db with fakes.
+// The worker-side pipeline for one Job: Reconstruction → Postprocessing →
+// Export/Storage (Moderation/Preprocessing slot in between in later tickets).
+// External effects go through injected deps so tests can run against the test
+// db with fakes; Postprocessing is pure CPU, so the real implementation runs
+// everywhere, tests included.
 
 export type FetchedImage = {
   bytes: Uint8Array;
@@ -36,15 +38,20 @@ export async function processJob(deps: ProcessJobDeps, jobId: string): Promise<v
       contentType: image.contentType,
     });
 
-    await transition(deps.db, jobId, "reconstructing", "exporting");
+    await transition(deps.db, jobId, "reconstructing", "postprocessing");
+    // Repairs holes and verifies watertightness — throws (failing the job)
+    // rather than letting an open mesh reach storage.
+    const { glb: repairedGlb } = await repairToWatertight(glb);
+
+    await transition(deps.db, jobId, "postprocessing", "exporting");
     const r2Key = `assets/${row.userId}/${jobId}.glb`;
-    await deps.assets.uploadGlb(r2Key, glb);
+    await deps.assets.uploadGlb(r2Key, repairedGlb);
     await deps.db.insert(asset).values({
       id: crypto.randomUUID(),
       jobId,
       userId: row.userId,
       r2Key,
-      sizeBytes: glb.byteLength,
+      sizeBytes: repairedGlb.byteLength,
     });
 
     await transition(deps.db, jobId, "exporting", "succeeded");

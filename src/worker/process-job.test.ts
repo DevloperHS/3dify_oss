@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { asset, job, user } from "@/db/schema";
+import { countBoundaryEdges } from "@/postprocessing/watertight";
 import { StubReconstructionEngine } from "@/reconstruction/stub-engine";
 import type { AssetStorage } from "@/storage/assets";
 import { processJob, type ProcessJobDeps } from "./process-job";
@@ -72,6 +73,8 @@ describe("processJob", () => {
     expect(new DataView(glb.buffer, glb.byteOffset).getUint32(0, true)).toBe(
       0x46546c67,
     );
+    // Postprocessing ran: what reaches storage is watertight (ticket 04).
+    expect(await countBoundaryEdges(glb)).toBe(0);
   });
 
   it("marks the job failed when the engine throws, and stores no asset", async () => {

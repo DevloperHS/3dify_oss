@@ -14,6 +14,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.1085.0
         version: 3.1085.0
+      '@gltf-transform/core':
+        specifier: ^4.4.1
+        version: 4.4.1
       '@google/model-viewer':
         specifier: ^4.3.1
         version: 4.3.1(three@0.183.2)
@@ -826,6 +829,9 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@gltf-transform/core@4.4.1':
+    resolution: {integrity: sha512-ygWWFOrj1HnfvBimHF1yHTY4abbeBjn3CvljijaWKoRLMRV/a8pWYQu9rfMFQhfpT5kYZTD5Mp+dizAXPbiTDQ==}
 
   '@google/model-viewer@4.3.1':
     resolution: {integrity: sha512-GP+inXhAtY31E8rILVmByA6z8CZZjdlNajddppyI1/j1eIaSQiZcMRaUqTFe7+jv4mzRzwKIOiKBud0apiv+WQ==}
@@ -2904,6 +2910,9 @@ packages:
   prop-types@15.8.1:
     resolution: {integrity: sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==}
 
+  property-graph@4.1.0:
+    resolution: {integrity: sha512-AvPcP7XECNWy4LGmFQ77k7un4lSKM4eS29PTvW4ck95uYeLxXPWJM7hLuBqK91FaHqCcgJvIUCuNJjjxKE7VKQ==}
+
   punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
@@ -3997,6 +4006,10 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@gltf-transform/core@4.4.1':
+    dependencies:
+      property-graph: 4.1.0
 
   '@google/model-viewer@4.3.1(three@0.183.2)':
     dependencies:
@@ -6063,6 +6076,8 @@ snapshots:
       loose-envify: 1.4.0
       object-assign: 4.1.1
       react-is: 16.13.1
+
+  property-graph@4.1.0: {}
 
   punycode@2.3.1: {}
 

@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { job } from "@/db/schema";
 import { enqueueJob } from "@/jobs/queue";
 import { getCurrentUser } from "@/lib/session";
+import { moderationEnabled } from "@/moderation/gate";
 import { sourceImageStorage } from "@/storage/source-images";
 import { validateUpload } from "@/upload/constraints";
 
@@ -9,6 +10,10 @@ import { validateUpload } from "@/upload/constraints";
 // constraints (JPEG/PNG/WebP, ≤10MB, ≥256×256 — ticket 05), store it as a
 // Source Image, create the Job row, enqueue it, and return immediately — the
 // client never blocks on pipeline completion.
+//
+// With moderation on (ticket 06), the Job is created in `moderating` and is
+// NOT enqueued here — Cloudinary's webhook enqueues it on approval, so no
+// pipeline compute ever runs on an unscreened image.
 
 export async function POST(request: Request): Promise<Response> {
   const user = await getCurrentUser(request.headers);
@@ -29,16 +34,31 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: verdict.error }, { status: 400 });
   }
 
-  const stored = await sourceImageStorage.upload(bytes, `image/${verdict.format}`);
+  const moderated = moderationEnabled();
+  if (moderated && !process.env.MODERATION_WEBHOOK_URL) {
+    return Response.json(
+      { error: "moderation is misconfigured" },
+      { status: 500 },
+    );
+  }
+  const stored = await sourceImageStorage.upload(
+    bytes,
+    `image/${verdict.format}`,
+    moderated
+      ? { moderation: { notificationUrl: process.env.MODERATION_WEBHOOK_URL! } }
+      : undefined,
+  );
 
   const jobId = crypto.randomUUID();
+  const status = moderated ? "moderating" : "queued";
   await db.insert(job).values({
     id: jobId,
     userId: user.id,
+    status,
     sourceImageUrl: stored.url,
     sourceImagePublicId: stored.publicId,
   });
-  await enqueueJob(jobId);
+  if (!moderated) await enqueueJob(jobId);
 
-  return Response.json({ id: jobId, status: "queued" }, { status: 201 });
+  return Response.json({ id: jobId, status }, { status: 201 });
 }

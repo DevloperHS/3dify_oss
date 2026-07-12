@@ -130,6 +130,36 @@ describe("POST /api/jobs", () => {
     expect(response.status).toBe(201);
   });
 
+  it("with moderation on: creates the job in `moderating`, requests aws_rek, and does NOT enqueue", async () => {
+    vi.stubEnv("MODERATION_ENABLED", "true");
+    vi.stubEnv("MODERATION_WEBHOOK_URL", "https://maker.test/api/webhooks/cloudinary-moderation");
+    try {
+      const headers = await signedInHeaders(
+        `upload-moderated-${Date.now()}@example.com`,
+        "Uploader",
+      );
+      const response = await POST(uploadRequest(headers, await pngFile()));
+      expect(response.status).toBe(201);
+      const body = await response.json();
+      expect(body.status).toBe("moderating");
+
+      const [row] = await db.select().from(job).where(eq(job.id, body.id));
+      expect(row.status).toBe("moderating");
+      expect(enqueueJob).not.toHaveBeenCalled();
+      expect(sourceImageStorage.upload).toHaveBeenCalledWith(
+        expect.anything(),
+        "image/png",
+        {
+          moderation: {
+            notificationUrl: "https://maker.test/api/webhooks/cloudinary-moderation",
+          },
+        },
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("stores the image, creates a queued job owned by the user, and enqueues it", async () => {
     const email = `upload-ok-${Date.now()}@example.com`;
     const headers = await signedInHeaders(email, "Uploader");

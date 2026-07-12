@@ -16,4 +16,18 @@ you're back. Everything else was built and tested against fakes/stubs.
       (non-cube) mesh renders — then tick the last box in
       `.scratch/image-to-3d-mvp/issues/03-real-reconstruction-triposr-modal.md`
 
+## 2. Cloudinary moderation add-on (ticket 06 — live verification)
+
+The gate is fully built and tested behind a flag; flipping it on needs:
+
+- [ ] Cloudinary dashboard → Add-ons → "Amazon Rekognition AI Moderation" →
+      subscribe to the free tier (50 moderations/month, no card)
+- [ ] Set `MODERATION_ENABLED=true` in `.env`
+- [ ] Set `MODERATION_WEBHOOK_URL` to a publicly reachable URL for
+      `/api/webhooks/cloudinary-moderation` — in production that's the deploy
+      domain; for a local test use a tunnel (e.g. `cloudflared tunnel` or
+      `ngrok`) pointing at :3000
+- [ ] Upload a photo and watch it pass through `moderating`; the webhook
+      handler logs its outcome in the response
+
 *(items added below as the run discovers them)*

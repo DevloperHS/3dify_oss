@@ -90,10 +90,13 @@ export class ModalReconstructionEngine implements ReconstructionEngine {
   }
 }
 
+// Both Modal-hosted models (TripoSR and TRELLIS) share this engine — same
+// HTTP contract, different endpoint URL env var.
 export function modalEngineFromEnv(
   env: Record<string, string | undefined> = process.env,
+  urlVar: "MODAL_TRIPOSR_URL" | "MODAL_TRELLIS_URL" = "MODAL_TRIPOSR_URL",
 ): ModalReconstructionEngine {
-  const missing = ["MODAL_TRIPOSR_URL", "MODAL_KEY", "MODAL_SECRET"].filter(
+  const missing = [urlVar, "MODAL_KEY", "MODAL_SECRET"].filter(
     (name) => !env[name],
   );
   if (missing.length > 0) {
@@ -103,13 +106,11 @@ export function modalEngineFromEnv(
   }
   // Catches .env.example placeholders ("replace-me") at startup instead of
   // failing confusingly on the first job.
-  if (!URL.canParse(env.MODAL_TRIPOSR_URL!)) {
-    throw new Error(
-      `MODAL_TRIPOSR_URL is not a valid URL: "${env.MODAL_TRIPOSR_URL}"`,
-    );
+  if (!URL.canParse(env[urlVar]!)) {
+    throw new Error(`${urlVar} is not a valid URL: "${env[urlVar]}"`);
   }
   return new ModalReconstructionEngine({
-    endpointUrl: env.MODAL_TRIPOSR_URL!,
+    endpointUrl: env[urlVar]!,
     modalKey: env.MODAL_KEY!,
     modalSecret: env.MODAL_SECRET!,
     timeoutMs: env.RECONSTRUCTION_TIMEOUT_MS

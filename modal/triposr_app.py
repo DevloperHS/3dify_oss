@@ -113,6 +113,7 @@ class TripoSR:
     def _reconstruct(self, image_bytes: bytes) -> bytes:
         import numpy as np
         import torch
+        import trimesh
         from PIL import Image as PILImage
         from tsr.utils import remove_background, resize_foreground
 
@@ -129,7 +130,16 @@ class TripoSR:
             scene_codes = self.model([pil], device=self.device)
         # Second arg True = compute vertex colors (we never bake textures).
         meshes = self.model.extract_mesh(scene_codes, True, resolution=MC_RESOLUTION)
-        glb = meshes[0].export(file_type="glb")
+        mesh = meshes[0]
+        # TripoSR meshes aren't glTF Y-up; without this the model lies on its
+        # side in viewers. Same fix TripoSR's demo applies before display.
+        mesh.apply_transform(
+            trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0])
+        )
+        mesh.apply_transform(
+            trimesh.transformations.rotation_matrix(np.pi / 2, [0, 1, 0])
+        )
+        glb = mesh.export(file_type="glb")
         if isinstance(glb, str):
             glb = glb.encode()
         return glb

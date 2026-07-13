@@ -70,6 +70,10 @@ image = (
         "transformers==4.35.0",
         "trimesh==4.0.5",
         "rembg[cpu]",
+        # rembg's dependency tree pulls numpy 2.x over the earlier 1.26.4 pin;
+        # trimesh 4.0.5 still calls ndarray.ptp(), removed in numpy 2 — so the
+        # export step 500s at runtime. Repeat the pin in this layer to hold it.
+        "numpy==1.26.4",
         "huggingface-hub",
         "fastapi[standard]",
     )

@@ -52,7 +52,9 @@ export async function countBoundaryEdges(glb: Uint8Array): Promise<number> {
   for (const mesh of doc.getRoot().listMeshes()) {
     for (const prim of mesh.listPrimitives()) {
       if (prim.getMode() !== Primitive.Mode.TRIANGLES) continue;
-      count += boundaryDirectedEdges(readIndices(prim)).size;
+      for (const ends of boundaryDirectedEdges(readIndices(prim)).values()) {
+        count += ends.length;
+      }
     }
   }
   return count;
@@ -73,7 +75,10 @@ function readIndices(prim: Primitive): Uint32Array {
 
 // Directed edges (a→b) whose undirected edge belongs to exactly one
 // triangle — the hole boundaries, oriented as their owning triangle winds.
-function boundaryDirectedEdges(indices: Uint32Array): Map<number, number> {
+// A start vertex can have several outgoing boundary edges (two holes pinched
+// together at one vertex — real TripoSR output does this), so the map keeps
+// every end, not just the last one seen.
+function boundaryDirectedEdges(indices: Uint32Array): Map<number, number[]> {
   const undirectedCount = new Map<number, number>();
   for (let i = 0; i < indices.length; i += 3) {
     for (const [a, b] of triangleEdges(indices, i)) {
@@ -81,11 +86,14 @@ function boundaryDirectedEdges(indices: Uint32Array): Map<number, number> {
       undirectedCount.set(key, (undirectedCount.get(key) ?? 0) + 1);
     }
   }
-  // Map from edge start → edge end, so loops can be walked start-to-start.
-  const boundary = new Map<number, number>();
+  const boundary = new Map<number, number[]>();
   for (let i = 0; i < indices.length; i += 3) {
     for (const [a, b] of triangleEdges(indices, i)) {
-      if (undirectedCount.get(edgeKey(a, b)) === 1) boundary.set(a, b);
+      if (undirectedCount.get(edgeKey(a, b)) === 1) {
+        const ends = boundary.get(a);
+        if (ends) ends.push(b);
+        else boundary.set(a, [b]);
+      }
     }
   }
   return boundary;
@@ -110,7 +118,9 @@ function triangleEdges(
 function capHoles(doc: Document, prim: Primitive): number {
   const indices = readIndices(prim);
   const boundary = boundaryDirectedEdges(indices);
-  if (boundary.size === 0) return 0;
+  let edgeCount = 0;
+  for (const ends of boundary.values()) edgeCount += ends.length;
+  if (edgeCount === 0) return 0;
 
   const attributes = prim.listSemantics().map((semantic) => ({
     semantic,
@@ -135,38 +145,48 @@ function capHoles(doc: Document, prim: Primitive): number {
   let nextVertex = vertexCount;
   let holesFilled = 0;
 
-  const unvisited = new Map(boundary);
-  while (unvisited.size > 0) {
-    const [start, first] = unvisited.entries().next().value!;
-    // Walk start → ... → start. A walk that dead-ends (non-manifold boundary
-    // vertex with no continuation) is abandoned; repairToWatertight's final
-    // verification will surface it.
-    const loop = [start];
-    let current = first;
-    while (current !== start && unvisited.has(current) && loop.length <= boundary.size) {
-      loop.push(current);
-      current = unvisited.get(current)!;
-    }
-    for (const vertex of loop) unvisited.delete(vertex);
-    if (current !== start || loop.length < 3) continue;
-
-    // Centroid vertex: every attribute is the loop average.
-    for (const { size, data } of attributeData) {
-      for (let j = 0; j < size; j++) {
-        let sum = 0;
-        for (const vertex of loop) sum += data[vertex * size + j];
-        data.push(sum / loop.length);
+  // Walk closed trails, consuming one directed edge per step. Each step pops
+  // an edge, so a vertex shared by two holes (multiple outgoing boundary
+  // edges) is passed through once per hole instead of losing an edge. A trail
+  // that revisits a vertex (figure-eight hole) still caps cleanly: every
+  // boundary edge gets its missing neighbor triangle, and the repeated
+  // vertex's spoke edge is shared by four cap triangles — even, so not a
+  // boundary. Leftover edges of a partially-walked component are picked up
+  // as their own closed trails on later iterations.
+  for (const start of boundary.keys()) {
+    let outs: number[] | undefined;
+    while ((outs = boundary.get(start)) && outs.length > 0) {
+      const loop = [start];
+      let current = outs.pop()!;
+      // Walk start → ... → start. A walk that dead-ends (unbalanced boundary
+      // vertex with no continuation) is abandoned; repairToWatertight's final
+      // verification will surface it.
+      while (current !== start) {
+        const next = boundary.get(current);
+        if (!next || next.length === 0) break;
+        loop.push(current);
+        current = next.pop()!;
       }
+      if (current !== start || loop.length < 3) continue;
+
+      // Centroid vertex: every attribute is the loop average.
+      for (const { size, data } of attributeData) {
+        for (let j = 0; j < size; j++) {
+          let sum = 0;
+          for (const vertex of loop) sum += data[vertex * size + j];
+          data.push(sum / loop.length);
+        }
+      }
+      // Boundary edge a→b winds like its owning triangle, so the cap triangle
+      // (the missing neighbor) winds b→a→centroid.
+      for (let i = 0; i < loop.length; i++) {
+        const a = loop[i];
+        const b = loop[(i + 1) % loop.length];
+        newTriangles.push(b, a, nextVertex);
+      }
+      nextVertex++;
+      holesFilled++;
     }
-    // Boundary edge a→b winds like its owning triangle, so the cap triangle
-    // (the missing neighbor) winds b→a→centroid.
-    for (let i = 0; i < loop.length; i++) {
-      const a = loop[i];
-      const b = loop[(i + 1) % loop.length];
-      newTriangles.push(b, a, nextVertex);
-    }
-    nextVertex++;
-    holesFilled++;
   }
 
   if (holesFilled === 0) return 0;

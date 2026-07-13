@@ -6,12 +6,13 @@ you're back. Everything else was built and tested against fakes/stubs.
 
 ## 1. Modal deploy (ticket 03 — live TripoSR verification)
 
-- [ ] Sign up at modal.com (GitHub login, starter plan, no card)
+- [x] Sign up at modal.com (GitHub login, starter plan, no card)
 - [ ] `modal token new` (opens browser)
-- [ ] `modal deploy modal/triposr_app.py` (~10-15 min first build)
-- [ ] Dashboard → Settings → Proxy Auth Tokens → create; put
+- [x] `modal deploy modal/triposr_app.py` (~10-15 min first build)
+- [x] Dashboard → Settings → Proxy Auth Tokens → create; put
       `MODAL_TRIPOSR_URL`, `MODAL_KEY`, `MODAL_SECRET` in `.env`
-- [ ] Smoke: `modal run modal/triposr_app.py --image-path <photo.png>`
+- [x] Smoke: `modal run modal/triposr_app.py --image-path <photo.png>`
+      (ran 2026-07-13 with the prototype chair — valid 1.65MB GLB back)
 - [ ] Live e2e: `pnpm dev` + `pnpm worker`, upload a photo, confirm a real
       (non-cube) mesh renders — then tick the last box in
       `.scratch/image-to-3d-mvp/issues/03-real-reconstruction-triposr-modal.md`

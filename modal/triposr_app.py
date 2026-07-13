@@ -30,9 +30,11 @@ SCALEDOWN_WINDOW_SECONDS = 60
 # request doesn't keep the GPU billing after the job has already failed.
 FUNCTION_TIMEOUT_SECONDS = 240
 
-# Marching-cubes grid resolution — 256 matches the prototype run that
-# validated output quality (wayfinder ticket 03).
-MC_RESOLUTION = 256
+# Marching-cubes grid resolution — raised from the prototype's 256 for finer
+# geometric detail after live runs judged 256 too coarse for game assets.
+# 512 crashes torchmcubes (native abort, dense-grid allocation); 320 is the
+# highest that ran reliably on this stack.
+MC_RESOLUTION = 320
 FOREGROUND_RATIO = 0.85
 
 

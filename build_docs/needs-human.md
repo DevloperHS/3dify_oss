@@ -7,13 +7,13 @@ you're back. Everything else was built and tested against fakes/stubs.
 ## 1. Modal deploy (ticket 03 — live TripoSR verification)
 
 - [x] Sign up at modal.com (GitHub login, starter plan, no card)
-- [ ] `modal token new` (opens browser)
+- [x] `modal token new` (opens browser)
 - [x] `modal deploy modal/triposr_app.py` (~10-15 min first build)
 - [x] Dashboard → Settings → Proxy Auth Tokens → create; put
       `MODAL_TRIPOSR_URL`, `MODAL_KEY`, `MODAL_SECRET` in `.env`
 - [x] Smoke: `modal run modal/triposr_app.py --image-path <photo.png>`
       (ran 2026-07-13 with the prototype chair — valid 1.65MB GLB back)
-- [ ] Live e2e: `pnpm dev` + `pnpm worker`, upload a photo, confirm a real
+- [x] Live e2e (2026-07-13): `pnpm dev` + `pnpm worker`, upload a photo, confirm a real
       (non-cube) mesh renders — then tick the last box in
       `.scratch/image-to-3d-mvp/issues/03-real-reconstruction-triposr-modal.md`
 
@@ -37,8 +37,8 @@ Your `.env` currently has `RECONSTRUCTION_ENGINE=stub` so `pnpm worker` runs
 without a Modal deployment (I switched it — it was `modal` with `replace-me`
 placeholders, which fails at startup by design). After completing item 1:
 
-- [ ] Fill the real `MODAL_TRIPOSR_URL` / `MODAL_KEY` / `MODAL_SECRET`
-- [ ] Set `RECONSTRUCTION_ENGINE=modal`
+- [x] Fill the real `MODAL_TRIPOSR_URL` / `MODAL_KEY` / `MODAL_SECRET`
+- [x] Set `RECONSTRUCTION_ENGINE=modal`
 
 ## 4. Live end-to-end pass (browser)
 

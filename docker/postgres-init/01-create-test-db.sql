@@ -1,1 +1,1 @@
-CREATE DATABASE maker_test OWNER maker;
+CREATE DATABASE threedify_test OWNER threedify;

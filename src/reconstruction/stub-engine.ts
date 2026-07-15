@@ -69,7 +69,7 @@ function buildCubeGlb(): Uint8Array {
   bin.set(indexBytes, positionBytes.byteLength + colorBytes.byteLength);
 
   const gltf = {
-    asset: { version: "2.0", generator: "maker stub reconstruction engine" },
+    asset: { version: "2.0", generator: "3dify stub reconstruction engine" },
     scene: 0,
     scenes: [{ nodes: [0] }],
     nodes: [{ mesh: 0, name: "placeholder" }],

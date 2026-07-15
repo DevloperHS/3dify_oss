@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Maker",
+  title: "3dify",
   description: "Turn a photo of an object into a 3D asset.",
 };
 

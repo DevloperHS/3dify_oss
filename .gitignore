@@ -44,3 +44,11 @@ client_secret_*.json
 *.tsbuildinfo
 next-env.d.ts
 __pycache__/
+
+# AI agent config, skills, and spec/ticket paper trail
+/AGENTS.md
+/CLAUDE.md
+/.claude/
+/.scratch/
+/build_docs/
+/skills-lock.json
